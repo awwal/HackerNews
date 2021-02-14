@@ -3,24 +3,26 @@ package com.lawal
 
 import akka.actor.ActorSystem
 import com.lawal.ApiModel.{HNStory, ItemList}
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-object HackerRank extends App with JsonSupport {
+object HackerNews extends App with JsonSupport {
+  private val logger = LoggerFactory.getLogger(this.getClass)
 
 
   implicit val system: ActorSystem = ActorSystem("HackerNews")
 
   import system.dispatcher
 
-  val COMMENT_LIMIT = 5
-  val TOP_STORIES_COUNT = 3
-  private val pooledHttpClient = new PooledHttpClient()
+  val TOP_STORIES_COUNT = 30
+  val COMMENT_LIMIT = 10
+  val httpClient = new QueuedHttpClient()
   val storyList: Future[List[HNStory]] = getTopStories(TOP_STORIES_COUNT)
 
   val allStoryUserComments: Future[List[StoryStat]] = storyList.flatMap(xs => {
-    val items: List[Future[StoryStat]] = for (x <- xs) yield new StoryStatCollector(x, COMMENT_LIMIT).fetch()
+    val items: List[Future[StoryStat]] = for (x <- xs) yield new StoryStatAggregator(x, COMMENT_LIMIT, new QueuedHttpClient()).fetch()
     val sf: Future[List[StoryStat]] = Future.sequence(items)
     sf
   })
@@ -30,16 +32,22 @@ object HackerRank extends App with JsonSupport {
     case util.Success(storyStats) =>
       val globalUserStat = new GlobalUserStat()
       storyStats.foreach(s => globalUserStat.addUserComments(s.userCommentCount))
-      TableRenderer.print(COMMENT_LIMIT, storyStats, globalUserStat)
-       system.terminate()
+
+      val content = TableRenderer.renderTable(COMMENT_LIMIT, storyStats, globalUserStat, 80*2)
+      if(content.isDefined){
+        println(content.get)
+      }
+      system.terminate()
     case Failure(exception) =>
+      logger.info("Ending with error",exception)
       system.terminate()
   }
 
 
   def getTopStories(limit: Int): Future[List[HNStory]] = {
-    val responseFuture: Future[ItemList] = pooledHttpClient.getTopHNItems
+    val responseFuture: Future[ItemList] = httpClient.getTopHNItems
     val storyList: Future[List[HNStory]] = responseFuture.flatMap(itemList => {
+      logger.debug("Total top item size =" + itemList.size)
       fetchAllLinks(itemList, limit)
     })
     storyList
@@ -47,25 +55,18 @@ object HackerRank extends App with JsonSupport {
 
 
   def fetchAllLinks(itemList: ItemList, limit: Int): Future[List[HNStory]] = {
-    println(itemList.size)
-    val items = for (item <- itemList.take(limit)) yield pooledHttpClient.fetchTopItem(item)
+    val items = for (item <- itemList.take(limit)) yield httpClient.fetchTopItem(item)
     Future.sequence(items)
       .map(list => {
         //val stories = list.filter(it => it.`type`.equalsIgnoreCase("story"))
         //val top50 = stories.sortBy(_.score)(Ordering[Int].reverse).take(limit)
         val top50 = list.zipWithIndex
           .map { case (el, idx) => HNStory(el, idx) }
-        println("Done fetching top stories")
+        logger.info(s"Done fetching top $limit  stories")
         top50
       })
 
   }
 
-//  private
-//  def printResult[T](fs: Future[List[T]]): Unit = {
-//    fs onComplete {
-//      case Success(xs) => xs.foreach(println)
-//    }
-//  }
 }
 

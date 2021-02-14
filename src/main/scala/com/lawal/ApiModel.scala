@@ -2,7 +2,7 @@ package com.lawal
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import com.lawal.ApiModel.{CommentItem, HNItem, TopItem}
-import spray.json.DefaultJsonProtocol
+import spray.json.{DefaultJsonProtocol, NullOptions}
 
 object ApiModel {
   type ItemList = List[Int]
@@ -20,7 +20,7 @@ object ApiModel {
     }
   }
 }
-trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
+trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol  {
   implicit val itemFormat = jsonFormat5(HNItem)
   implicit val topItemFormat = jsonFormat4(TopItem)
   implicit  val commentItemFormat = jsonFormat2(CommentItem)

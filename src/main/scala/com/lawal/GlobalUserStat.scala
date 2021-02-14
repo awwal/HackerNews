@@ -9,6 +9,10 @@ class GlobalUserStat {
     commentCounts.foreach(addUserComment)
   }
 
+  def ++(userCommentCount: UserCommentCount): GlobalUserStat = {
+    addUserComment(userCommentCount)
+    this
+  }
 
   private def addUserComment(userCommentCount: UserCommentCount): Unit = {
     m.updateWith(userCommentCount.userId)({

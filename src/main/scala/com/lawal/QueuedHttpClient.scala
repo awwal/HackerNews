@@ -9,20 +9,23 @@ import akka.pattern.RetrySupport
 import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import com.lawal.ApiModel.{CommentItem, ItemList, TopItem}
+import org.slf4j.LoggerFactory
 
+import javax.xml.ws.Response
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class PooledHttpClient(implicit system: ActorSystem) extends JsonSupport {
+class QueuedHttpClient(implicit system: ActorSystem) extends JsonSupport with HackerNewsSDK {
   type HttpReqRes = (HttpRequest, Promise[HttpResponse])
 
   implicit val scheduler: akka.actor.Scheduler = system.scheduler
 
   import system.dispatcher
 
-  val QueueSize = 50
+  val QueueSize = 1000
 
+  private val logger = LoggerFactory.getLogger(this.getClass)
 
   private val poolClientFlow = Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]]("hacker-news.firebaseio.com")
   val queue: SourceQueueWithComplete[HttpReqRes] = Source.queue[HttpReqRes](QueueSize, OverflowStrategy.dropNew)
@@ -35,7 +38,7 @@ class PooledHttpClient(implicit system: ActorSystem) extends JsonSupport {
 
 
   def queueRequest(request: HttpRequest): Future[HttpResponse] = {
-    sendReceiveRetry(request)
+    offerWithRetry(request)
   }
 
   private def offerRequest(request: HttpRequest): Future[HttpResponse] = {
@@ -54,8 +57,8 @@ class PooledHttpClient(implicit system: ActorSystem) extends JsonSupport {
   }
 
 
-  private def sendReceiveRetry(req: HttpRequest): Future[HttpResponse] = {
-    println("Trying " + req.getUri())
+  private def offerWithRetry(req: HttpRequest): Future[HttpResponse] = {
+    logger.debug("Retrying " + req.getUri())
     RetrySupport.retry[HttpResponse](
       attempt = () => offerRequest(req),
       attempts = 10,
@@ -76,7 +79,6 @@ class PooledHttpClient(implicit system: ActorSystem) extends JsonSupport {
     queueRequest(request).flatMap(res => Unmarshal(res.entity).to[CommentItem])
 
   }
-
   def fetchTopItem(linkId: Int): Future[TopItem] = {
     val request = HttpRequest(uri = s"/v0/item/${linkId}.json", headers = List(Accept(MediaTypes.`application/json`)))
     queueRequest(request).flatMap(res => Unmarshal(res.entity).to[TopItem])

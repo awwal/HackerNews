@@ -4,18 +4,23 @@ import de.vandermeer.asciitable.AsciiTable
 
 object TableRenderer {
 
-  def print(commentColumnSize: Int, storyStats: List[StoryStat], globalUserStat: GlobalUserStat): Unit = {
+  def renderTable(numberOfColumns: Int, storyStats: Seq[StoryStat], globalUserStat: GlobalUserStat, tableWidth: Int): Option[String] = {
+    if (numberOfColumns == 0 && storyStats.isEmpty) {
+      return None
+    }
     val at = new AsciiTable
     at.addRule()
-    val headers: Seq[String] = createHeaders(commentColumnSize)
+    val headers = createHeaders(numberOfColumns)
     at.addRow(headers: _*)
     at.addRule()
-    storyStats.sortBy(_.story.rank).foreach(stat => {
-      val row: Seq[String] = createRow(stat.story.title, stat.userCommentCount, headers.size, globalUserStat)
+    storyStats.sortBy(_.rank).foreach(stat => {
+      val row = createRow(stat.storyTitle, stat.userCommentCount.toList.take(numberOfColumns), headers.size, globalUserStat)
       at.addRow(row: _*)
       at.addRule()
     })
-    println(at.render(80 * 2))
+
+    val content = at.render(tableWidth)
+    Some(content)
   }
 
   def createRow(title: String, userCommentCount: List[UserCommentCount], rowSize: Int,
@@ -27,8 +32,8 @@ object TableRenderer {
       s"${uc.userId}: ${uc.count} for story, ${total} total"
     })
     val row = title :: comments
-    val fill = rowSize - row.size
-    row ++ Array.fill(fill)("")
+    val left = rowSize - row.size
+    row ++ Array.fill(left)("")
   }
 
   private def ordinal(i: Int): String = {
