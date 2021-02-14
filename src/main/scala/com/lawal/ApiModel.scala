@@ -2,7 +2,7 @@ package com.lawal
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import com.lawal.ApiModel.{CommentItem, HNItem, TopItem}
-import spray.json.{DefaultJsonProtocol, NullOptions}
+import spray.json.DefaultJsonProtocol
 
 object ApiModel {
   type ItemList = List[Int]

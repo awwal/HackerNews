@@ -6,12 +6,10 @@ import com.lawal.ApiModel.{HNStory, ItemList}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.util.Failure
 
 object HackerNews extends App with JsonSupport {
   private val logger = LoggerFactory.getLogger(this.getClass)
-
-
   implicit val system: ActorSystem = ActorSystem("HackerNews")
 
   import system.dispatcher
@@ -22,9 +20,8 @@ object HackerNews extends App with JsonSupport {
   val storyList: Future[List[HNStory]] = getTopStories(TOP_STORIES_COUNT)
 
   val allStoryUserComments: Future[List[StoryStat]] = storyList.flatMap(xs => {
-    val items: List[Future[StoryStat]] = for (x <- xs) yield new StoryStatAggregator(x, COMMENT_LIMIT, new QueuedHttpClient()).fetch()
-    val sf: Future[List[StoryStat]] = Future.sequence(items)
-    sf
+    val stats: List[Future[StoryStat]] = for (x <- xs) yield new StoryStatAggregator(x, COMMENT_LIMIT, httpClient).fetch()
+    Future.sequence(stats)
   })
 
 
@@ -33,20 +30,20 @@ object HackerNews extends App with JsonSupport {
       val globalUserStat = new GlobalUserStat()
       storyStats.foreach(s => globalUserStat.addUserComments(s.userCommentCount))
 
-      val content = TableRenderer.renderTable(COMMENT_LIMIT, storyStats, globalUserStat, 80*2)
-      if(content.isDefined){
+      val content = TableRenderer.renderTable(COMMENT_LIMIT, storyStats, globalUserStat, 80 * 2)
+      if (content.isDefined) {
         println(content.get)
       }
       system.terminate()
     case Failure(exception) =>
-      logger.info("Ending with error",exception)
+      logger.info("Ending with error", exception)
       system.terminate()
   }
 
 
   def getTopStories(limit: Int): Future[List[HNStory]] = {
-    val responseFuture: Future[ItemList] = httpClient.getTopHNItems
-    val storyList: Future[List[HNStory]] = responseFuture.flatMap(itemList => {
+    val itemList = httpClient.getTopHNItems
+    val storyList: Future[List[HNStory]] = itemList.flatMap(itemList => {
       logger.debug("Total top item size =" + itemList.size)
       fetchAllLinks(itemList, limit)
     })

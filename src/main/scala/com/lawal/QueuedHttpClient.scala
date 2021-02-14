@@ -11,13 +11,12 @@ import akka.stream.{OverflowStrategy, QueueOfferResult}
 import com.lawal.ApiModel.{CommentItem, ItemList, TopItem}
 import org.slf4j.LoggerFactory
 
-import javax.xml.ws.Response
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class QueuedHttpClient(implicit system: ActorSystem) extends JsonSupport with HackerNewsSDK {
-  type HttpReqRes = (HttpRequest, Promise[HttpResponse])
+class QueuedHttpClient (implicit system: ActorSystem) extends JsonSupport with HackerNewsSDK {
+
 
   implicit val scheduler: akka.actor.Scheduler = system.scheduler
 
@@ -37,8 +36,15 @@ class QueuedHttpClient(implicit system: ActorSystem) extends JsonSupport with Ha
     .run()
 
 
-  def queueRequest(request: HttpRequest): Future[HttpResponse] = {
-    offerWithRetry(request)
+  def queueRequest(req: HttpRequest): Future[HttpResponse] = {
+    logger.debug("Trying" + req.getUri())
+    RetrySupport.retry[HttpResponse](
+      attempt = () => offerRequest(req),
+      attempts = 10,
+      minBackoff = 1.seconds,
+      maxBackoff = 2.seconds,
+      randomFactor = 0.5
+    )
   }
 
   private def offerRequest(request: HttpRequest): Future[HttpResponse] = {
@@ -56,17 +62,6 @@ class QueuedHttpClient(implicit system: ActorSystem) extends JsonSupport with Ha
     }
   }
 
-
-  private def offerWithRetry(req: HttpRequest): Future[HttpResponse] = {
-    logger.debug("Retrying " + req.getUri())
-    RetrySupport.retry[HttpResponse](
-      attempt = () => offerRequest(req),
-      attempts = 10,
-      minBackoff = 1.seconds,
-      maxBackoff = 2.seconds,
-      randomFactor = 0.5
-    )
-  }
 
 
   def getTopHNItems: Future[ItemList] = {

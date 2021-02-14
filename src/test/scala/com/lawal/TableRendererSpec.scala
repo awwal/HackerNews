@@ -1,10 +1,7 @@
 package com.lawal
 
-import com.lawal.ApiModel.HNStory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
-
-import java.util.UUID
 
 class TableRendererSpec extends AnyFlatSpec {
 

@@ -14,16 +14,15 @@ class StoryStatAggregator(story: HNStory, commentLimit: Int, clientSDK: HackerNe
   def fetch(): Future[StoryStat] = {
 
     logger.info(s"Fetching comment for story [${story.title}] rank ${story.rank}")
-    val items: List[Future[List[CommentItem]]] = for (commentId <- story.commentIds) yield walkCommentLink(commentId)
-    val allComments: Future[List[CommentItem]] = Future.sequence(items).map(list => list.flatten)
+    val fCommentList: List[Future[List[CommentItem]]] = for (commentId <- story.commentIds) yield walkCommentLink(commentId)
+    val allComments = Future.sequence(fCommentList).map(list => list.flatten)
     val commenters = allComments.map(list => list.flatMap(it => it.by))
     val eventualStoryStat: Future[StoryStat] = commenters.map(userlist => toUserStat(story, userlist))
     eventualStoryStat
 
   }
 
-  private
-  def toUserStat(story: HNStory, userList: List[String]): StoryStat = {
+  private def toUserStat(story: HNStory, userList: List[String]): StoryStat = {
     val userToCommentCount: View[(String, Int)] = userList.groupBy(identity).view.mapValues(_.size);
     val top = userToCommentCount.toList.sortBy(_._2)(Ordering[Int].reverse)
       .take(commentLimit)
@@ -32,7 +31,7 @@ class StoryStatAggregator(story: HNStory, commentLimit: Int, clientSDK: HackerNe
   }
 
 
-  //  @tailrec
+  //@tailrec --todo
   private
   def walkCommentLink(commentId: Int): Future[List[CommentItem]] = {
     logger.debug(s"Currently on comment $commentId in story [${story.title}]")
@@ -50,8 +49,7 @@ class StoryStatAggregator(story: HNStory, commentLimit: Int, clientSDK: HackerNe
     })
   }
 
-  private
-  def mergeFutureLists[X](xs: Future[List[X]], ys: Future[List[X]]): Future[List[X]] = {
+  private def mergeFutureLists[X](xs: Future[List[X]], ys: Future[List[X]]): Future[List[X]] = {
     for {
       x <- xs
       y <- ys
