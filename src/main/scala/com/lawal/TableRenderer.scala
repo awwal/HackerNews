@@ -1,25 +1,27 @@
 package com.lawal
 
-import de.vandermeer.asciitable.AsciiTable
+import net.steppschuh.markdowngenerator.table.Table
+
 
 object TableRenderer {
 
-  def renderTable(numberOfColumns: Int, storyStats: Seq[StoryStat], globalUserStat: GlobalUserStat, tableWidth: Int): Option[String] = {
+  def renderTable(numberOfColumns: Int, storyStats: Seq[StoryStat], globalUserStat: GlobalUserStat): Option[String] = {
     if (numberOfColumns == 0 && storyStats.isEmpty) {
       return None
     }
-    val at = new AsciiTable
-    at.addRule()
+    val tableBuilder = new Table.Builder()
+
     val headers = createHeaders(numberOfColumns)
-    at.addRow(headers: _*)
-    at.addRule()
+    tableBuilder.addRow(headers: _*)
     storyStats.sortBy(_.rank).foreach(stat => {
       val row = createRow(stat.storyTitle, stat.userCommentCount.toList.take(numberOfColumns), headers.size, globalUserStat)
-      at.addRow(row: _*)
-      at.addRule()
+      if (row.nonEmpty) {
+        tableBuilder.addRow(row: _*)
+      }
     })
 
-    val content = at.render(tableWidth)
+    val table = tableBuilder.build()
+    val content = table.serialize()
     Some(content)
   }
 

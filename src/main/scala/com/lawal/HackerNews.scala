@@ -30,7 +30,7 @@ object HackerNews extends App with JsonSupport {
       val globalUserStat = new GlobalUserStat()
       storyStats.foreach(s => globalUserStat.addUserComments(s.userCommentCount))
 
-      val content = TableRenderer.renderTable(COMMENT_LIMIT, storyStats, globalUserStat, 80 * 2)
+      val content = TableRenderer.renderTable(COMMENT_LIMIT, storyStats, globalUserStat)
       if (content.isDefined) {
         println(content.get)
       }
