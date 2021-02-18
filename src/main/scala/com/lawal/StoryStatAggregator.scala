@@ -35,18 +35,17 @@ class StoryStatAggregator(story: HNStory, commentLimit: Int, clientSDK: HackerNe
   private
   def walkCommentLink(commentId: Int): Future[List[CommentItem]] = {
     logger.debug(s"Currently on comment $commentId in story [${story.title}]")
-    clientSDK.fetchComment(commentId) flatMap ((comment: CommentItem) => {
-
+    clientSDK.fetchComment(commentId).flatMap { comment =>
       val f: Future[List[CommentItem]] = Future(List(comment))
-      if (comment.kids.isDefined && comment.kids.get.nonEmpty) {
-        val childFutures: List[Future[List[CommentItem]]] = for (commentId <- comment.kids.get) yield walkCommentLink(commentId)
-        val fs = Future.sequence(childFutures).map(list => list.flatten)
-        mergeFutureLists(fs, f)
+      comment.kids match {
+        case Some(kids) if kids.nonEmpty =>
+          val childFutures: List[Future[List[CommentItem]]] = for (commentId <- comment.kids.get) yield walkCommentLink(commentId)
+          val fs = Future.sequence(childFutures).map(list => list.flatten)
+          mergeFutureLists(fs, f)
+        case None =>
+          f
       }
-      else {
-        f
-      }
-    })
+    }
   }
 
   private def mergeFutureLists[X](xs: Future[List[X]], ys: Future[List[X]]): Future[List[X]] = {

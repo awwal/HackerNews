@@ -25,18 +25,16 @@ class StoryStatAggregatorSpec extends AsyncFlatSpec {
       Future(List[Int]())
     }
 
-    override def fetchComment(linkId: Int): Future[ApiModel.CommentItem] = Future {
+    override def fetchComment(linkId: Int): Future[CommentItem] = Future {
       val user = Some(s"user$linkId")
-      if (linkId == 1) {
-        CommentItem(user, Some(List(11, 12)))
-      }
-      else {
-        CommentItem(user, Some(List[Int]()))
+      linkId match {
+        case 1 => CommentItem(user, Some(List(11, 12)))
+        case _ => CommentItem(user, Some(List[Int]()))
       }
     }
 
-    override def fetchTopItem(linkId: Int): Future[ApiModel.TopItem] = Future {
-      TopItem("", None, "", 1)
+    override def fetchTopItem(linkId: Int): Future[Option[TopItem]] = Future {
+      Some(TopItem("", None, "", 1))
     }
   }
 

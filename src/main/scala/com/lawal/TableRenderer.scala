@@ -49,7 +49,8 @@ object TableRenderer {
 
   private def createHeaders(limit: Int): Seq[String] = {
     (0 to limit).map {
-      i => if (i == 0) "Story" else s" ${ordinal(i)} Top Commenter"
+      case 0 => "Story"
+      case i => s"${ordinal(i)} Top Commenter"
     }
   }
 

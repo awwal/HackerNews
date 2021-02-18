@@ -14,7 +14,7 @@ object HackerNews extends App with JsonSupport {
 
   import system.dispatcher
 
-  val TOP_STORIES_COUNT = 30
+  val TOP_STORIES_COUNT = 3
   val COMMENT_LIMIT = 10
   val httpClient = new QueuedHttpClient()
   val storyList: Future[List[HNStory]] = getTopStories(TOP_STORIES_COUNT)
@@ -31,9 +31,7 @@ object HackerNews extends App with JsonSupport {
       storyStats.foreach(s => globalUserStat.addUserComments(s.userCommentCount))
 
       val content = TableRenderer.renderTable(COMMENT_LIMIT, storyStats, globalUserStat)
-      if (content.isDefined) {
-        println(content.get)
-      }
+      content.foreach(println)
       system.terminate()
     case Failure(exception) =>
       logger.info("Ending with error", exception)
@@ -54,10 +52,9 @@ object HackerNews extends App with JsonSupport {
   def fetchAllLinks(itemList: ItemList, limit: Int): Future[List[HNStory]] = {
     val items = for (item <- itemList.take(limit)) yield httpClient.fetchTopItem(item)
     Future.sequence(items)
-      .map(list => {
-        //val stories = list.filter(it => it.`type`.equalsIgnoreCase("story"))
+      .map(xs => {
         //val top50 = stories.sortBy(_.score)(Ordering[Int].reverse).take(limit)
-        val top50 = list.zipWithIndex
+        val top50 = xs.flatten.zipWithIndex
           .map { case (el, idx) => HNStory(el, idx) }
         logger.info(s"Done fetching top $limit  stories")
         top50

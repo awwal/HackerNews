@@ -9,13 +9,14 @@ import akka.pattern.RetrySupport
 import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import com.lawal.ApiModel.{CommentItem, ItemList, TopItem}
+import com.lawal.TopItemJsonProtocol._
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class QueuedHttpClient (implicit system: ActorSystem) extends JsonSupport with HackerNewsSDK {
+class QueuedHttpClient(implicit system: ActorSystem) extends JsonSupport with HackerNewsSDK {
 
 
   implicit val scheduler: akka.actor.Scheduler = system.scheduler
@@ -24,6 +25,7 @@ class QueuedHttpClient (implicit system: ActorSystem) extends JsonSupport with H
 
   val QueueSize = 1000
 
+  private lazy val emptyComment = CommentItem(None, Some(List[Int]()))
   private val logger = LoggerFactory.getLogger(this.getClass)
 
   private val poolClientFlow = Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]]("hacker-news.firebaseio.com")
@@ -63,19 +65,24 @@ class QueuedHttpClient (implicit system: ActorSystem) extends JsonSupport with H
   }
 
 
-
   def getTopHNItems: Future[ItemList] = {
     val request = HttpRequest(uri = "/v0/topstories.json", headers = List(Accept(MediaTypes.`application/json`)))
     queueRequest(request).flatMap(res => Unmarshal(res.entity).to[ItemList])
   }
 
+  override def fetchTopItem(linkId: Int): Future[Option[TopItem]] = {
+    val request = HttpRequest(uri = s"/v0/item/${linkId}.json", headers = List(Accept(MediaTypes.`application/json`)))
+    queueRequest(request).flatMap(res => Unmarshal(res.entity).to[Option[TopItem]])
+  }
+
+
   def fetchComment(linkId: Int): Future[CommentItem] = {
     val request = HttpRequest(uri = s"/v0/item/${linkId}.json", headers = List(Accept(MediaTypes.`application/json`)))
-    queueRequest(request).flatMap(res => Unmarshal(res.entity).to[CommentItem])
+    queueRequest(request).flatMap(res => Unmarshal(res.entity).to[CommentItem].recoverWith {
+      case ex =>
+        logger.error("An error while unmarshalling", ex)
+        Future.successful(emptyComment)
+    })
 
-  }
-  def fetchTopItem(linkId: Int): Future[TopItem] = {
-    val request = HttpRequest(uri = s"/v0/item/${linkId}.json", headers = List(Accept(MediaTypes.`application/json`)))
-    queueRequest(request).flatMap(res => Unmarshal(res.entity).to[TopItem])
   }
 }
